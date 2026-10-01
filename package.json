@@ -1,0 +1,36 @@
+{
+  "name": "@andrelair-platform/bff-auth",
+  "version": "0.1.0",
+  "description": "Framework-agnostic OAuth2 client-credentials token provider for server-side BFFs calling JWKS-protected backends on the minicloud platform.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "sideEffects": false,
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/andrelair-platform/bff-auth.git"
+  },
+  "publishConfig": {
+    "@andrelair-platform:registry": "https://npm.pkg.github.com"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}
