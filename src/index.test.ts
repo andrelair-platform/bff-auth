@@ -34,7 +34,7 @@ describe("createClientCredentialsTokenProvider", () => {
     const fetchImpl = vi.fn().mockResolvedValue(okResponse("tok-1", 300));
     const provider = createClientCredentialsTokenProvider(CFG, { fetchImpl: fetchImpl as unknown as typeof fetch });
     await expect(provider()).resolves.toBe("tok-1");
-    const [url, init] = fetchImpl.mock.calls[0];
+    const [url, init] = fetchImpl.mock.calls[0]!;
     expect(url).toBe(CFG.tokenUrl);
     const body = (init as RequestInit).body as URLSearchParams;
     expect(body.get("grant_type")).toBe("client_credentials");
