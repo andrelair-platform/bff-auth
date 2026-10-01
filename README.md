@@ -4,10 +4,11 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)](https://www.typescriptlang.org/)
 
-> A tiny, framework-agnostic OAuth2 **client-credentials** token provider for server-side BFFs that call
-> JWKS-protected backends on the minicloud / ktayl-solution platform. It mints a scoped Authentik bearer
-> token server-side and caches it in memory until shortly before expiry — mirroring the backend-side
-> pattern so both ends of a service call share one mental model.
+> A tiny OAuth2 **client-credentials** token provider for server-side BFFs that call JWKS-protected
+> backends on the minicloud / ktayl-solution platform. The grant itself is delegated to
+> [**openid-client**](https://github.com/panva/openid-client) (the spec-complete, zero-dep OAuth2/OIDC
+> client); this package adds only the thin platform convention on top — env-driven config, a per-instance
+> in-memory cache (until shortly before expiry), and "no config → null" so a BFF stays auth-off in dev.
 
 **Why:** a Next.js (or any Node) BFF calling a backend that validates Authentik JWTs must present a
 scoped bearer. Rather than reimplement the client-credentials grant + caching in every app, consume this.
@@ -56,11 +57,11 @@ const getToken = createClientCredentialsTokenProvider({
 
 ## API
 
-| Export | Purpose |
-|---|---|
-| `createClientCredentialsTokenProvider(config \| null, options?)` | A provider with its **own** cache. `null` config → always resolves `null` (auth off). |
-| `tokenProviderFromEnv(prefix?, options?)` | Convenience provider configured from env (null if any key missing). |
-| `clientCredentialsConfigFromEnv(prefix?, env?)` | Build a config object from env, or `null`. |
+| Export                                                            | Purpose                                                                                         |
+| ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `createClientCredentialsTokenProvider(config \| null, options?)` | A provider with its**own** cache. `null` config → always resolves `null` (auth off). |
+| `tokenProviderFromEnv(prefix?, options?)`                       | Convenience provider configured from env (null if any key missing).                             |
+| `clientCredentialsConfigFromEnv(prefix?, env?)`                 | Build a config object from env, or`null`.                                                     |
 
 **Options:** `expirySkewMs` (default 30s), `defaultTtlMs` (default 300s), `fetchImpl` + `now` (injectable for tests).
 

@@ -1,14 +1,16 @@
-// @andrelair-platform/bff-auth — a tiny, framework-agnostic OAuth2 client-credentials token provider
-// for server-side BFFs that call JWKS-protected backends on the minicloud platform.
+// @andrelair-platform/bff-auth — a tiny OAuth2 client-credentials token provider for server-side BFFs
+// that call JWKS-protected backends on the minicloud platform.
 //
 // A BFF (e.g. a Next.js server component / server action) must present a scoped bearer token to a
 // backend that validates Authentik-issued JWTs. This mints that token via the client-credentials grant
-// and caches it in memory until shortly before expiry. It mirrors the backend-side pattern
-// (ktayl-underwriting app/bind/token.py) so both sides of a call share one mental model.
+// and caches it in memory until shortly before expiry.
 //
-// Design: a FACTORY returns a provider with its OWN cache — so an app can hold several providers
-// (different scopes/clients) without a shared module-global colliding. `fetchImpl`/`now` are injectable
-// for tests. No framework or Node-API dependency beyond global `fetch` (Node 18+ / edge / browsers).
+// The OAuth2 grant itself is delegated to **openid-client** (panva) — the de-facto, spec-complete,
+// zero-runtime-dependency OAuth2/OIDC client — rather than hand-rolled. This package adds only the thin
+// platform convention on top: env-driven config, a per-instance cache, and "no config → null" so a BFF
+// can wire it unconditionally and stay auth-off in dev.
+
+import * as oidc from "openid-client";
 
 /** OAuth2 client-credentials configuration for one token audience. */
 export interface ClientCredentialsConfig {
@@ -24,10 +26,15 @@ export interface TokenProviderOptions {
   expirySkewMs?: number;
   /** Lifetime to assume when the token endpoint omits expires_in. Default 300s. */
   defaultTtlMs?: number;
-  /** Injectable fetch (tests / non-global-fetch runtimes). Default: global fetch. */
+  /** Injectable fetch (tests / non-global-fetch runtimes). Wired into openid-client. */
   fetchImpl?: typeof fetch;
   /** Injectable clock (tests). Default: Date.now. */
   now?: () => number;
+  /**
+   * Permit a plain-HTTP token endpoint. Defaults to true when the endpoint is `http:` (minicloud
+   * internal services are cluster-HTTP behind NetworkPolicies); set false to force HTTPS-only.
+   */
+  allowInsecureHttp?: boolean;
 }
 
 /** A provider yields a bearer token string, or null when no config is present (auth-off / dev). */
@@ -42,15 +49,9 @@ function defaultEnv(): Record<string, string | undefined> {
   return g.process?.env ?? {};
 }
 
-interface TokenResponse {
-  access_token: string;
-  expires_in?: number;
-}
-
 /**
  * Build a cached client-credentials token provider for one config.
- * Pass `null` config → the provider always resolves to `null` (auth disabled, e.g. dev) so callers
- * can wire it unconditionally: `const h = token ? { Authorization: ` + "`Bearer ${token}`" + ` } : {}`.
+ * Pass `null` config → the provider always resolves to `null` (auth disabled, e.g. dev).
  */
 export function createClientCredentialsTokenProvider(
   config: ClientCredentialsConfig | null,
@@ -58,40 +59,41 @@ export function createClientCredentialsTokenProvider(
 ): TokenProvider {
   const skew = options.expirySkewMs ?? DEFAULT_EXPIRY_SKEW_MS;
   const defaultTtl = options.defaultTtlMs ?? DEFAULT_TTL_MS;
-  const doFetch = options.fetchImpl ?? globalThis.fetch;
   const now = options.now ?? Date.now;
+
+  // Build the openid-client Configuration once (no discovery — the token endpoint is explicit).
+  let oidcConfig: oidc.Configuration | null = null;
+  if (config) {
+    const tokenUrl = new URL(config.tokenUrl);
+    oidcConfig = new oidc.Configuration(
+      { issuer: tokenUrl.origin, token_endpoint: config.tokenUrl },
+      config.clientId,
+      config.clientSecret,
+      // Send credentials in the POST body (client_secret_post) — matches Authentik's confidential client.
+      oidc.ClientSecretPost(config.clientSecret),
+    );
+    const allowHttp = options.allowInsecureHttp ?? tokenUrl.protocol === "http:";
+    if (allowHttp) oidc.allowInsecureRequests(oidcConfig);
+    if (options.fetchImpl) {
+      (oidcConfig as unknown as Record<symbol, typeof fetch>)[oidc.customFetch] = options.fetchImpl;
+    }
+  }
 
   let cachedToken: string | null = null;
   let expiresAtMs = 0;
 
   return async function getToken(): Promise<string | null> {
-    if (!config) return null;
+    if (!config || !oidcConfig) return null;
 
     const t = now();
     if (cachedToken !== null && t < expiresAtMs - skew) {
       return cachedToken;
     }
-    if (typeof doFetch !== "function") {
-      throw new Error("bff-auth: no fetch implementation available (pass options.fetchImpl)");
-    }
 
-    const res = await doFetch(config.tokenUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        grant_type: "client_credentials",
-        client_id: config.clientId,
-        client_secret: config.clientSecret,
-        scope: config.scope,
-      }),
-      cache: "no-store",
-    });
-    if (!res.ok) {
-      throw new Error(`bff-auth: OIDC token endpoint returned ${res.status}`);
-    }
-    const body = (await res.json()) as TokenResponse;
-    cachedToken = body.access_token;
-    expiresAtMs = t + (body.expires_in != null ? body.expires_in * 1000 : defaultTtl);
+    const tokens = await oidc.clientCredentialsGrant(oidcConfig, { scope: config.scope });
+    cachedToken = tokens.access_token;
+    const ttlMs = tokens.expires_in != null ? Number(tokens.expires_in) * 1000 : defaultTtl;
+    expiresAtMs = t + ttlMs;
     return cachedToken;
   };
 }

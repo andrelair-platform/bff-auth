@@ -16,7 +16,7 @@
   ],
   "sideEffects": false,
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
@@ -36,5 +36,8 @@
   "devDependencies": {
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
+  },
+  "dependencies": {
+    "openid-client": "^6.8.8"
   }
 }
