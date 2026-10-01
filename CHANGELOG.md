@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/andrelair-platform/bff-auth/compare/bff-auth-v0.1.1...bff-auth-v0.1.2) (2026-10-01)
+
+
+### Features
+
+* delegate the client-credentials grant to openid-client ([f1d08e4](https://github.com/andrelair-platform/bff-auth/commit/f1d08e433287311c1e2e9ce9ca7393cb12c6854d))
+
 ## [0.1.1](https://github.com/andrelair-platform/bff-auth/compare/bff-auth-v0.1.0...bff-auth-v0.1.1) (2026-10-01)
 
 
