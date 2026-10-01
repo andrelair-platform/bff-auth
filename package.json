@@ -1,6 +1,6 @@
 {
   "name": "@andrelair-platform/bff-auth",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Framework-agnostic OAuth2 client-credentials token provider for server-side BFFs calling JWKS-protected backends on the minicloud platform.",
   "type": "module",
   "main": "./dist/index.js",
@@ -11,9 +11,13 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "sideEffects": false,
-  "engines": { "node": ">=18" },
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",
